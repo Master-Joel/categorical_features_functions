@@ -34,17 +34,14 @@ TEST = df.drop(TRAIN.index)
 TRAIN = TRAIN.reset_index(drop=True)
 TEST = TEST.reset_index(drop=True)
 
-# Lists of categorical and numerical variables.
-categorical = df.select_dtypes(include=["object"]).columns
-numerical = df.select_dtypes(exclude=["object"]).columns
+"""
+----------
+"""
 
-def replacing_na_and_combining_values(TRAIN, TEST=None, fill_na_with="median",
-                                      threshold=0.01):
+def replace_na(TRAIN, TEST=None, fill_na_with="median"):
     """
-    Replace missing values by "missing" in the categorical variables and
-    using a given strategy in the numerical variables.
-    Replace the values that occur less than the threshold in each categorical
-    column by "other".
+    Replace missing values by "missing" for the categorical variables and
+    by using one of the four "strategies" available for the numerical variables.
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -52,80 +49,99 @@ def replacing_na_and_combining_values(TRAIN, TEST=None, fill_na_with="median",
         fill_na_with: string or float, optional (default="median").
             The imputation strategy: "median", "mean", "most_frequent"
             or a float.
-        threshold: float, optional (default=0.01).
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
-    
-    # Replace missing values in the categorical variables by "missing".
-    TRAIN[categorical] = TRAIN[categorical].fillna("missing")
+    numerical = TRAIN.select_dtypes(exclude=["object"]).columns    
 
-    # Replace missing values in the numerical variables by the strategy chosen.
+    TRAIN[categorical] = TRAIN[categorical].fillna("missing")
     if isinstance(fill_na_with, str):
         imputer = preprocessing.Imputer(missing_values="NaN",
                                         strategy=fill_na_with, axis=0)
         TRAIN[numerical] = imputer.fit_transform(TRAIN[numerical])
     else:
         TRAIN[numerical] = TRAIN[numerical].fillna(value=fill_na_with)
-
-    # Combine together the values which appear less than the threshold
-    # in the categorical variables.
-    for col in categorical:
-        counts = TRAIN[col].value_counts(normalize=True)
-        TRAIN.loc[TRAIN[col].isin(counts[counts <= threshold].index),
-                  col] = "other"
-
-    # If TEST is not None do the same process.
     if TEST is not None:
         TEST[categorical] = TEST[categorical].fillna("missing")
-
         if isinstance(fill_na_with, str):
             TEST[numerical] = imputer.transform(TEST[numerical])
         else:
             TEST[numerical] = TEST[numerical].fillna(value=fill_na_with)
-
-        for col in categorical:
-            TEST.loc[TEST[col].isin(counts[counts <= threshold].index),
-                     col] = "other"
         return (TRAIN, TEST)
     else:
         return TRAIN
 
-TRAIN, TEST = replacing_na_and_combining_values(TRAIN, TEST,
-                                                fill_na_with="median",
-                                                threshold=0.01)
-
-# for col in categorical:
-#     print("")
-#     print("-----")
-#     print("")
-#     print(TRAIN[col].value_counts(dropna=False))
+TRAIN, TEST = replace_na(TRAIN, TEST, fill_na_with="median")
 
 """
 ----------
 """
 
-def to_numerical_sorted_alphabetically(TRAIN, TEST=None, classes=False):
+def combine_values(TRAIN, TEST=None, threshold=0.01):
+    """
+    Replace the values that occur less than the threshold in each categorical
+    feature by "other".
+    -----
+    Arguments:
+        TRAIN: DataFrame.
+        TEST: DataFrame, optional (default=None).
+        threshold: float, optional (default=0.01).
+    -----
+    Returns:
+        TRAIN: DataFrame.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
+    """
+    categorical = TRAIN.select_dtypes(include=["object"]).columns
+
+    if TEST is not None:
+        for col in categorical:
+            counts = TRAIN[col].value_counts(normalize=True)
+            TRAIN.loc[TRAIN[col].isin(counts[counts <= threshold].index),
+                      col] = "other"
+            TEST.loc[TEST[col].isin(counts[counts <= threshold].index),
+                     col] = "other"
+        return (TRAIN, TEST)
+    else:
+        for col in categorical:
+            counts = TRAIN[col].value_counts(normalize=True)
+            TRAIN.loc[TRAIN[col].isin(counts[counts <= threshold].index),
+                      col] = "other"
+        return TRAIN
+
+TRAIN, TEST = combine_values(TRAIN, TEST, threshold=0.01)
+
+"""
+----------
+"""
+
+def transform_categorical_alphabetically(TRAIN, TEST=None, classes=False):
     """
     Transform categorical features to numerical. The categories are encoded
     alphabetically (0 for the first one, 1 for the second, etc.).
+    To be consistent with scikit-learn transformers having categories 
+    in transform that are not present during training will raise an error
+    by default.
     -----
     Arguments:
         TRAIN: DataFrame.
         TEST: DataFrame, optional (default=None).
         classes: boolean, optional (default=False).
             Print the categories and the corresponding value for each
-            categorical features.
+            categorical feature.
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
     le = preprocessing.LabelEncoder()
+
     if TEST is not None:
         for col in categorical:
             TRAIN[col] = le.fit_transform(TRAIN[col])
@@ -152,69 +168,104 @@ def to_numerical_sorted_alphabetically(TRAIN, TEST=None, classes=False):
                           np.sort(TRAIN[col].unique())[i]))
         return TRAIN
 
-# TRAIN, TEST = to_numerical_sorted_alphabetically(TRAIN, TEST, classes=True)
+# TRAIN, TEST = transform_categorical_alphabetically(TRAIN, TEST, classes=True)
 
 """
 ----------
 """
 
-def to_numerical_sorted_by_count(TRAIN, TEST=None, classes=False):
+def transform_categorical_sorted_by_count(TRAIN, TEST=None, 
+                                          handle_unknown="error", 
+                                          classes=False):
     """
     Transform categorical features to numerical. The categories are encoded
-    in descending order (0 for the most frequent category, 1 for the second
-    most frequent, etc.).
+    in descending order ("0" for the most frequent category, "1" for the second
+    most frequent one, etc.).
+    To be consistent with scikit-learn transformers having categories 
+    in transform that are not present during training will raise an error
+    by default.
     -----
     Arguments:
         TRAIN: DataFrame.
         TEST: DataFrame, optional (default=None).
+        handle_unknown: str, "error", "ignore" or "NaN", 
+        optional (default="error").
+            Whether to raise an error, ignore or replace by NA if a unknown 
+            category is present during transform.
         classes: boolean, optional (default=False).
             Print the categories and the corresponding value for each
-            categorical features.
+            categorical feature.
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
+    
     if TEST is not None:
         for col in categorical:
-            cat_ordered = TRAIN[col].value_counts()
-            dict_cat_values = dict(zip(cat_ordered.index,
-                                       range(len(cat_ordered))))
-            TRAIN[col] = TRAIN[col].replace(dict_cat_values)
-            TEST[col] = TEST[col].replace(dict_cat_values)
+            cat_counts = TRAIN[col].value_counts()
+            dict_cat_counts = dict(zip(cat_counts.index, 
+                                       range(len(cat_counts))))
+            not_in_train = list(set(TEST[col].unique()) - set(cat_counts.index))
+            if len(not_in_train) > 0:
+                if handle_unknown == "error":
+                    raise ValueError("TEST contains new labels: {0} "
+                    "in variable {1}.".format(not_in_train, col))
+                if handle_unknown == "ignore":
+                    print("")
+                    print("-----")
+                    print("")
+                    print("Variable: {0}".format(col))
+                    print("Unknown category(ies) {0} present during transform "
+                    "has(ve) been ignored.".format(not_in_train))
+                if handle_unknown == "NaN":
+                    print("")
+                    print("-----")
+                    print("")
+                    print("Variable: {0}".format(col))
+                    print("Unknown category(ies) {0} present during transform "
+                    "has(ve) been replaced by NA.".format(not_in_train))
+                    for item in not_in_train:
+                        dict_cat_counts[item] = np.nan
+            TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
+            TEST[col] = TEST[col].replace(dict_cat_counts)
             if classes:
                 print("")
                 print("-----")
                 print("")
                 print("Variable: {0}".format(col))
                 for i in range(len(TRAIN[col].unique())):
-                    print("{0}: {1}".format(cat_ordered.index[i], i))
+                    print("{0}: {1}".format(cat_counts.index[i], i))
         return (TRAIN, TEST)
     else:
         for col in categorical:
-            cat_ordered = TRAIN[col].value_counts()
-            dict_cat_values = dict(zip(cat_ordered.index,
-                                       range(len(cat_ordered))))
-            TRAIN[col] = TRAIN[col].replace(dict_cat_values)
+            cat_counts = TRAIN[col].value_counts()
+            dict_cat_counts = dict(zip(cat_counts.index,
+                                       range(len(cat_counts))))
+            TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             if classes:
                 print("")
                 print("-----")
                 print("")
                 print("Variable: {0}".format(col))
                 for i in range(len(TRAIN[col].unique())):
-                    print("{0}: {1}".format(cat_ordered.index[i], i))
+                    print("{0}: {1}".format(cat_counts.index[i], i))
     return TRAIN
 
-# TRAIN, TEST = to_numerical_sorted_by_count(TRAIN, TEST, classes=True)
+# TRAIN, TEST = transform_categorical_sorted_by_count(TRAIN, TEST, classes=True)
 
 """
 ----------
 """
 
-def to_dummy(TRAIN, TEST=None):
+def transform_categorical_to_dummy(TRAIN, TEST=None):
     """
     Transform categorical features to dummy variables.
+    To be consistent with scikit-learn transformers having categories 
+    in transform that are not present during training will raise an error
+    by default.
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -222,10 +273,12 @@ def to_dummy(TRAIN, TEST=None):
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
     dv = feature_extraction.DictVectorizer(sparse=False)
+    
     TRAIN = pd.concat([pd.DataFrame(dv.fit_transform(TRAIN[categorical].\
     to_dict("records"))), TRAIN[numerical]], axis=1)
     features_names = dv.get_feature_names()
@@ -240,16 +293,19 @@ def to_dummy(TRAIN, TEST=None):
     else:
         return TRAIN
 
-# TRAIN, TEST = to_dummy(TRAIN, TEST)
+# TRAIN, TEST = transform_categorical_to_dummy(TRAIN, TEST)
 
 """
 ----------
 """
 
-def to_numerical_replaced_by_count(TRAIN, TEST=None, classes=False):
+def transform_categorical_by_count(TRAIN, TEST=None, classes=False):
     """
     Transform categorical features to numerical. The categories are encoded
-    by their respective count (on both data frames if TEST is provided).
+    by their respective count (in the TRAIN dataset).
+    To be consistent with scikit-learn transformers having categories 
+    in transform that are not present during training will raise an error
+    by default.
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -260,13 +316,14 @@ def to_numerical_replaced_by_count(TRAIN, TEST=None, classes=False):
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
+
     if TEST is not None:
-        data = pd.concat([TRAIN, TEST])
         for col in categorical:
-            cat_counts = data[col].value_counts(dropna=False)
+            cat_counts = TRAIN[col].value_counts(dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, cat_counts))
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
@@ -288,17 +345,19 @@ def to_numerical_replaced_by_count(TRAIN, TEST=None, classes=False):
                 print(cat_counts)
     return TRAIN
 
-# TRAIN, TEST = to_numerical_replaced_by_count(TRAIN, TEST, classes=True)
+# TRAIN, TEST = transform_categorical_by_count(TRAIN, TEST, classes=True)
 
 """
 ----------
 """
 
-def to_numerical_replaced_by_percentage(TRAIN, TEST=None, classes=False):
+def transform_categorical_by_percentage(TRAIN, TEST=None, classes=False):
     """
     Transform categorical features to numerical. The categories are encoded
-    by their respective relative frequency (on both data frames if TEST
-    is provided).
+    by their relative frequency (in the TRAIN dataset).
+    To be consistent with scikit-learn transformers having categories 
+    in transform that are not present during training will raise an error
+    by default.
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -309,13 +368,14 @@ def to_numerical_replaced_by_percentage(TRAIN, TEST=None, classes=False):
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
+
     if TEST is not None:
-        data = pd.concat([TRAIN, TEST])
         for col in categorical:
-            cat_counts = data[col].value_counts(normalize=True, dropna=False)
+            cat_counts = TRAIN[col].value_counts(normalize=True, dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, cat_counts))
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
@@ -343,11 +403,9 @@ def to_numerical_replaced_by_percentage(TRAIN, TEST=None, classes=False):
 ----------
 """
 
-def numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
+def transform_numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
     """
-    Transform numerical features to numerical. The categories are encoded
-    by their respective relative frequency (on both data frames if TEST
-    is provided).
+    Transform numerical features to quantiles.
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -357,9 +415,11 @@ def numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
     -----
     Returns:
         TRAIN: DataFrame.
-        TEST: DataFrame if a second DataFrame was provided.
+        TEST: DataFrame.
+            This second DataFrame is returned if two DataFrames were provided.
     """
     numerical = TRAIN.select_dtypes(exclude=["object"]).columns
+
     if TEST is not None:
         for col in numerical:
             TRAIN[col], bins = pd.qcut(TRAIN[col], n_quantiles,
@@ -382,8 +442,7 @@ def numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
         return (TRAIN, TEST)
     else:
         for col in numerical:
-            TRAIN[col], bins = pd.qcut(TRAIN[col], 10, labels=False,
-                                       retbins=True)
+            TRAIN[col] = pd.qcut(TRAIN[col], n_quantiles, labels=False)
         return TRAIN
 
-# TRAIN, TEST = numerical_to_quantiles(TRAIN, TEST, n_quantiles=10)
+# TRAIN, TEST = transform_numerical_to_quantiles(TRAIN, TEST, n_quantiles=10)
