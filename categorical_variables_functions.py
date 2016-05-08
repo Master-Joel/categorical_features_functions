@@ -6,34 +6,6 @@ import random
 from sklearn import preprocessing
 from sklearn import feature_extraction
 
-# Create a data frame.
-d = {"col_1": np.random.choice(["a", "b", "c", "d"], size=1000000,
-                             p=[0.4, 0.2, 0.1, 0.3]),
-     "col_2": np.random.choice(["z", "e", "d", "a"], size=1000000,
-                             p=[0.2, 0.3, 0.4, 0.1]),
-     "col_3": np.random.normal(0, scale=2, size=1000000),
-     "col_4": np.random.normal(100, scale=25, size=1000000)}
-
-df = pd.DataFrame(d)
-
-# Replace 5% of the values by np.nan.
-for col in df.columns:
-    df.loc[random.sample(range(0, df.shape[0]), int(df.shape[0] * 0.05)),
-           col] = np.nan
-
-# Create TRAIN and TEST datasets.
-# Pandas >= 0.16.
-TRAIN = df.sample(frac=0.7, replace=False)
-TEST = df.drop(TRAIN.index)
-# Pandas < 0.16.
-# rows = random.sample(df2.index, int(df.shape[0] * 0.7))
-# TRAIN = df.ix[rows]
-# TEST = df.drop(rows)
-
-# Reset the index.
-TRAIN = TRAIN.reset_index(drop=True)
-TEST = TEST.reset_index(drop=True)
-
 """
 ----------
 """
@@ -56,7 +28,7 @@ def replace_na(TRAIN, TEST=None, fill_na_with="median"):
             This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
-    numerical = TRAIN.select_dtypes(exclude=["object"]).columns    
+    numerical = TRAIN.select_dtypes(exclude=["object"]).columns
 
     TRAIN[categorical] = TRAIN[categorical].fillna("missing")
     if isinstance(fill_na_with, str):
@@ -74,8 +46,6 @@ def replace_na(TRAIN, TEST=None, fill_na_with="median"):
         return (TRAIN, TEST)
     else:
         return TRAIN
-
-TRAIN, TEST = replace_na(TRAIN, TEST, fill_na_with="median")
 
 """
 ----------
@@ -100,7 +70,7 @@ def combine_values(TRAIN, TEST=None, threshold=0.01):
 
     if TEST is not None:
         for col in categorical:
-            counts = TRAIN[col].value_counts(normalize=True)
+            counts = TRAIN[col].value_counts(dropna=False, normalize=True)
             TRAIN.loc[TRAIN[col].isin(counts[counts <= threshold].index),
                       col] = "other"
             TEST.loc[TEST[col].isin(counts[counts <= threshold].index),
@@ -108,12 +78,10 @@ def combine_values(TRAIN, TEST=None, threshold=0.01):
         return (TRAIN, TEST)
     else:
         for col in categorical:
-            counts = TRAIN[col].value_counts(normalize=True)
+            counts = TRAIN[col].value_counts(dropna=False, normalize=True)
             TRAIN.loc[TRAIN[col].isin(counts[counts <= threshold].index),
                       col] = "other"
         return TRAIN
-
-TRAIN, TEST = combine_values(TRAIN, TEST, threshold=0.01)
 
 """
 ----------
@@ -168,8 +136,6 @@ def transform_categorical_alphabetically(TRAIN, TEST=None, classes=False):
                           np.sort(TRAIN[col].unique())[i]))
         return TRAIN
 
-# TRAIN, TEST = transform_categorical_alphabetically(TRAIN, TEST, classes=True)
-
 """
 ----------
 """
@@ -205,7 +171,7 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
     
     if TEST is not None:
         for col in categorical:
-            cat_counts = TRAIN[col].value_counts()
+            cat_counts = TRAIN[col].value_counts(dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, 
                                        range(len(cat_counts))))
             not_in_train = list(set(TEST[col].unique()) - set(cat_counts.index))
@@ -241,7 +207,7 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
         return (TRAIN, TEST)
     else:
         for col in categorical:
-            cat_counts = TRAIN[col].value_counts()
+            cat_counts = TRAIN[col].value_counts(dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index,
                                        range(len(cat_counts))))
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
@@ -253,8 +219,6 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
                 for i in range(len(TRAIN[col].unique())):
                     print("{0}: {1}".format(cat_counts.index[i], i))
     return TRAIN
-
-# TRAIN, TEST = transform_categorical_sorted_by_count(TRAIN, TEST, classes=True)
 
 """
 ----------
@@ -277,6 +241,7 @@ def transform_categorical_to_dummy(TRAIN, TEST=None):
             This second DataFrame is returned if two DataFrames were provided.
     """
     categorical = TRAIN.select_dtypes(include=["object"]).columns
+    numerical = TRAIN.select_dtypes(exclude=["object"]).columns
     dv = feature_extraction.DictVectorizer(sparse=False)
     
     TRAIN = pd.concat([pd.DataFrame(dv.fit_transform(TRAIN[categorical].\
@@ -293,13 +258,12 @@ def transform_categorical_to_dummy(TRAIN, TEST=None):
     else:
         return TRAIN
 
-# TRAIN, TEST = transform_categorical_to_dummy(TRAIN, TEST)
-
 """
 ----------
 """
 
-def transform_categorical_by_count(TRAIN, TEST=None, classes=False):
+def transform_categorical_by_count(TRAIN, TEST=None, handle_unknown="error", 
+                                   classes=False):
     """
     Transform categorical features to numerical. The categories are encoded
     by their respective count (in the TRAIN dataset).
@@ -310,6 +274,10 @@ def transform_categorical_by_count(TRAIN, TEST=None, classes=False):
     Arguments:
         TRAIN: DataFrame.
         TEST: DataFrame, optional (default=None).
+        handle_unknown: str, "error", "ignore" or "NaN", 
+        optional (default="error").
+            Whether to raise an error, ignore or replace by NA if a unknown 
+            category is present during transform.
         classes: boolean, optional (default=False).
             Print the categories and the corresponding value for each
             categorical features.
@@ -325,6 +293,27 @@ def transform_categorical_by_count(TRAIN, TEST=None, classes=False):
         for col in categorical:
             cat_counts = TRAIN[col].value_counts(dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, cat_counts))
+            not_in_train = list(set(TEST[col].unique()) - set(cat_counts.index))
+            if len(not_in_train) > 0:
+                if handle_unknown == "error":
+                    raise ValueError("TEST contains new labels: {0} "
+                    "in variable {1}.".format(not_in_train, col))
+                if handle_unknown == "ignore":
+                    print("")
+                    print("-----")
+                    print("")
+                    print("Variable: {0}".format(col))
+                    print("Unknown category(ies) {0} present during transform "
+                    "has(ve) been ignored.".format(not_in_train))
+                if handle_unknown == "NaN":
+                    print("")
+                    print("-----")
+                    print("")
+                    print("Variable: {0}".format(col))
+                    print("Unknown category(ies) {0} present during transform "
+                    "has(ve) been replaced by NA.".format(not_in_train))
+                    for item in not_in_train:
+                        dict_cat_counts[item] = np.nan
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
             if classes:
@@ -345,13 +334,12 @@ def transform_categorical_by_count(TRAIN, TEST=None, classes=False):
                 print(cat_counts)
     return TRAIN
 
-# TRAIN, TEST = transform_categorical_by_count(TRAIN, TEST, classes=True)
-
 """
 ----------
 """
 
-def transform_categorical_by_percentage(TRAIN, TEST=None, classes=False):
+def transform_categorical_by_percentage(TRAIN, TEST=None, 
+                                        handle_unknown="error", classes=False):
     """
     Transform categorical features to numerical. The categories are encoded
     by their relative frequency (in the TRAIN dataset).
@@ -362,6 +350,10 @@ def transform_categorical_by_percentage(TRAIN, TEST=None, classes=False):
     Arguments:
         TRAIN: DataFrame.
         TEST: DataFrame, optional (default=None).
+        handle_unknown: str, "error", "ignore" or "NaN", 
+        optional (default="error").
+            Whether to raise an error, ignore or replace by NA if a unknown 
+            category is present during transform.
         classes: boolean, optional (default=False).
             Print the categories and the corresponding value for each
             categorical features.
@@ -377,6 +369,27 @@ def transform_categorical_by_percentage(TRAIN, TEST=None, classes=False):
         for col in categorical:
             cat_counts = TRAIN[col].value_counts(normalize=True, dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, cat_counts))
+            not_in_train = list(set(TEST[col].unique()) - set(cat_counts.index))
+            if len(not_in_train) > 0:
+                if handle_unknown == "error":
+                    raise ValueError("TEST contains new labels: {0} "
+                    "in variable {1}.".format(not_in_train, col))
+                if handle_unknown == "ignore":
+                    print("")
+                    print("-----")
+                    print("")
+                    print("Variable: {0}".format(col))
+                    print("Unknown category(ies) {0} present during transform "
+                    "has(ve) been ignored.".format(not_in_train))
+                if handle_unknown == "NaN":
+                    print("")
+                    print("-----")
+                    print("")
+                    print("Variable: {0}".format(col))
+                    print("Unknown category(ies) {0} present during transform "
+                    "has(ve) been replaced by NA.".format(not_in_train))
+                    for item in not_in_train:
+                        dict_cat_counts[item] = np.nan
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
             if classes:
@@ -396,8 +409,6 @@ def transform_categorical_by_percentage(TRAIN, TEST=None, classes=False):
                 print("")
                 print(cat_counts)
     return TRAIN
-
-# TRAIN, TEST = to_numerical_replaced_by_percentage(TRAIN, TEST, classes=True)
 
 """
 ----------
@@ -444,5 +455,3 @@ def transform_numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
         for col in numerical:
             TRAIN[col] = pd.qcut(TRAIN[col], n_quantiles, labels=False)
         return TRAIN
-
-# TRAIN, TEST = transform_numerical_to_quantiles(TRAIN, TEST, n_quantiles=10)
