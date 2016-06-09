@@ -409,7 +409,7 @@ def transform_categorical_by_percentage(TRAIN, TEST=None,
             cat_counts = TRAIN[col].value_counts(normalize=True, dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, cat_counts))
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
