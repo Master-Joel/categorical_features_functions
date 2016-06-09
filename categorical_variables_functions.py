@@ -87,7 +87,7 @@ def combine_values(TRAIN, TEST=None, threshold=0.01):
 ----------
 """
 
-def transform_categorical_alphabetically(TRAIN, TEST=None, classes=False):
+def transform_categorical_alphabetically(TRAIN, TEST=None, verbose=0):
     """
     Transform categorical features to numerical. The categories are encoded
     alphabetically (0 for the first one, 1 for the second, etc.).
@@ -98,9 +98,8 @@ def transform_categorical_alphabetically(TRAIN, TEST=None, classes=False):
     Arguments:
         TRAIN: DataFrame.
         TEST: DataFrame, optional (default=None).
-        classes: boolean, optional (default=False).
-            Print the categories and the corresponding value for each
-            categorical feature.
+        verbose: integer, optional (default=0).
+            Controls the verbosity of the process.
     -----
     Returns:
         TRAIN: DataFrame.
@@ -114,26 +113,28 @@ def transform_categorical_alphabetically(TRAIN, TEST=None, classes=False):
         for col in categorical:
             TRAIN[col] = le.fit_transform(TRAIN[col])
             TEST[col] = le.transform(TEST[col])
-            if classes:
+            if verbose > 0:              
                 print("")
                 print("-----")
                 print("")
-                print("Variable: {0}".format(col))
-                for i in range(len(le.classes_)):
-                    print("{0}: {1}".format(le.classes_[i],
-                          np.sort(TRAIN[col].unique())[i]))
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    for i in range(len(le.classes_)):
+                        print("{0}: {1}".format(le.classes_[i],
+                              np.sort(TRAIN[col].unique())[i]))
         return (TRAIN, TEST)
     else:
         for col in categorical:
             TRAIN[col] = le.fit_transform(TRAIN[col])
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
-                print("Variable: {0}".format(col))
-                for i in range(len(le.classes_)):
-                    print("{0}: {1}".format(le.classes_[i],
-                          np.sort(TRAIN[col].unique())[i]))
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    for i in range(len(le.classes_)):
+                        print("{0}: {1}".format(le.classes_[i],
+                              np.sort(TRAIN[col].unique())[i]))
         return TRAIN
 
 """
@@ -142,7 +143,7 @@ def transform_categorical_alphabetically(TRAIN, TEST=None, classes=False):
 
 def transform_categorical_sorted_by_count(TRAIN, TEST=None, 
                                           handle_unknown="error", 
-                                          classes=False):
+                                          verbose=0):
     """
     Transform categorical features to numerical. The categories are encoded
     in descending order ("0" for the most frequent category, "1" for the second
@@ -158,9 +159,8 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
         optional (default="error").
             Whether to raise an error, ignore or replace by NA if a unknown 
             category is present during transform.
-        classes: boolean, optional (default=False).
-            Print the categories and the corresponding value for each
-            categorical feature.
+        verbose: integer, optional (default=0).
+            Controls the verbosity of the process.
     -----
     Returns:
         TRAIN: DataFrame.
@@ -197,13 +197,14 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
                         dict_cat_counts[item] = np.nan
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
-                print("Variable: {0}".format(col))
-                for i in range(len(TRAIN[col].unique())):
-                    print("{0}: {1}".format(cat_counts.index[i], i))
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    for i in range(len(TRAIN[col].unique())):
+                        print("{0}: {1}".format(cat_counts.index[i], i))
         return (TRAIN, TEST)
     else:
         for col in categorical:
@@ -211,13 +212,14 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
             dict_cat_counts = dict(zip(cat_counts.index,
                                        range(len(cat_counts))))
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
-                print("Variable: {0}".format(col))
-                for i in range(len(TRAIN[col].unique())):
-                    print("{0}: {1}".format(cat_counts.index[i], i))
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    for i in range(len(TRAIN[col].unique())):
+                        print("{0}: {1}".format(cat_counts.index[i], i))
     return TRAIN
 
 """
@@ -263,7 +265,7 @@ def transform_categorical_to_dummy(TRAIN, TEST=None):
 """
 
 def transform_categorical_by_count(TRAIN, TEST=None, handle_unknown="error", 
-                                   classes=False):
+                                   verbose=0):
     """
     Transform categorical features to numerical. The categories are encoded
     by their respective count (in the TRAIN dataset).
@@ -278,9 +280,8 @@ def transform_categorical_by_count(TRAIN, TEST=None, handle_unknown="error",
         optional (default="error").
             Whether to raise an error, ignore or replace by NA if a unknown 
             category is present during transform.
-        classes: boolean, optional (default=False).
-            Print the categories and the corresponding value for each
-            categorical features.
+        verbose: integer, optional (default=0).
+            Controls the verbosity of the process.
     -----
     Returns:
         TRAIN: DataFrame.
@@ -316,22 +317,26 @@ def transform_categorical_by_count(TRAIN, TEST=None, handle_unknown="error",
                         dict_cat_counts[item] = np.nan
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
-                print(cat_counts)
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    print(cat_counts)
         return (TRAIN, TEST)
     else:
         for col in categorical:
             cat_counts = TRAIN[col].value_counts(dropna=False)
             dict_cat_counts = dict(zip(cat_counts.index, cat_counts))
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
-                print(cat_counts)
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    print(cat_counts)
     return TRAIN
 
 """
@@ -339,7 +344,7 @@ def transform_categorical_by_count(TRAIN, TEST=None, handle_unknown="error",
 """
 
 def transform_categorical_by_percentage(TRAIN, TEST=None, 
-                                        handle_unknown="error", classes=False):
+                                        handle_unknown="error", verbose=0):
     """
     Transform categorical features to numerical. The categories are encoded
     by their relative frequency (in the TRAIN dataset).
@@ -354,9 +359,8 @@ def transform_categorical_by_percentage(TRAIN, TEST=None,
         optional (default="error").
             Whether to raise an error, ignore or replace by NA if a unknown 
             category is present during transform.
-        classes: boolean, optional (default=False).
-            Print the categories and the corresponding value for each
-            categorical features.
+        verbose: integer, optional (default=0).
+            Controls the verbosity of the process.
     -----
     Returns:
         TRAIN: DataFrame.
@@ -392,11 +396,13 @@ def transform_categorical_by_percentage(TRAIN, TEST=None,
                         dict_cat_counts[item] = np.nan
             TRAIN[col] = TRAIN[col].replace(dict_cat_counts)
             TEST[col] = TEST[col].replace(dict_cat_counts)
-            if classes:
+            if verbose > 0:
                 print("")
                 print("-----")
                 print("")
-                print(cat_counts)
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    print(cat_counts)
         return (TRAIN, TEST)
     else:
         for col in categorical:
@@ -407,7 +413,9 @@ def transform_categorical_by_percentage(TRAIN, TEST=None,
                 print("")
                 print("-----")
                 print("")
-                print(cat_counts)
+                print("Feature: {0}".format(col))
+                if verbose > 1:
+                    print(cat_counts)
     return TRAIN
 
 """
