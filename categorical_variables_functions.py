@@ -91,9 +91,9 @@ def transform_categorical_alphabetically(TRAIN, TEST=None, verbose=0):
     """
     Transform categorical features to numerical. The categories are encoded
     alphabetically (0 for the first one, 1 for the second, etc.).
-    To be consistent with scikit-learn transformers having categories 
-    in transform that are not present during training will raise an error
-    by default.
+    Having categories in transform that are not present during training 
+    will raise an error (which is the behavior of the scikit-learn's 
+    transformers).
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -229,9 +229,9 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
 def transform_categorical_to_dummy(TRAIN, TEST=None):
     """
     Transform categorical features to dummy variables.
-    To be consistent with scikit-learn transformers having categories 
-    in transform that are not present during training will raise an error
-    by default.
+    Having categories in transform that are not present during training 
+    will raise an error (which is the behavior of the scikit-learn's 
+    transformers).
     -----
     Arguments:
         TRAIN: DataFrame.
@@ -429,7 +429,7 @@ def transform_numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
     Arguments:
         TRAIN: DataFrame.
         TEST: DataFrame, optional (default=None).
-        n_quantiles: integer , optional (default=10).
+        n_quantiles: integer, optional (default=10).
             Number of quantiles.
     -----
     Returns:
