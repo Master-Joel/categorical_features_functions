@@ -10,7 +10,6 @@ from sklearn import feature_extraction
 # Replace missing values.
 # ----------------------- #
 
-
 def replace_na(TRAIN, TEST=None, fill_na_with="median"):
     """
     Replace missing values by "missing" for the categorical variables
@@ -63,7 +62,6 @@ def replace_na(TRAIN, TEST=None, fill_na_with="median"):
 # Combine values.
 # --------------- #
 
-
 def combine_values(TRAIN, TEST=None, threshold=0.01):
     """
     Replace the values that occur less than the threshold in each categorical
@@ -102,7 +100,6 @@ def combine_values(TRAIN, TEST=None, threshold=0.01):
 # ------------------------------------------------------------- #
 # Transform categorical features to numerical (alphabetically).
 # ------------------------------------------------------------- #
-
 
 def transform_categorical_alphabetically(TRAIN, TEST=None, verbose=0):
     """
@@ -156,7 +153,6 @@ def transform_categorical_alphabetically(TRAIN, TEST=None, verbose=0):
 # --------------------------------------------------------------- #
 # Transform categorical features to numerical (ordered by count).
 # --------------------------------------------------------------- #
-
 
 def transform_categorical_sorted_by_count(TRAIN, TEST=None,
                                           handle_unknown="error",
@@ -242,7 +238,6 @@ def transform_categorical_sorted_by_count(TRAIN, TEST=None,
 # Transform categorical features to numerical (dummy).
 # ---------------------------------------------------- #
 
-
 def transform_categorical_to_dummy(TRAIN, TEST=None):
     """
     Transform categorical features to dummy variables.
@@ -281,7 +276,6 @@ def transform_categorical_to_dummy(TRAIN, TEST=None):
 # ------------------------------------------------------- #
 # Transform categorical features to numerical (by count).
 # ------------------------------------------------------- #
-
 
 def transform_categorical_by_count(TRAIN, TEST=None, handle_unknown="error",
                                    verbose=0):
@@ -438,7 +432,6 @@ def transform_categorical_by_percentage(TRAIN, TEST=None,
 # ------------------------------------------ #
 # Transform numerical features to quantiles.
 # ------------------------------------------ #
-
 
 def transform_numerical_to_quantiles(TRAIN, TEST=None, n_quantiles=10):
     """
